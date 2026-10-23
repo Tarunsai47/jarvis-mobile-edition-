@@ -23,7 +23,12 @@ async function callGemini(p) {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: p }] }] })
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: "You are J.A.R.V.I.S., an advanced AI assistant. Keep responses helpful, concise, and smart." }]
+            },
+            contents: [{ parts: [{ text: p }] }]
+          })
         }
       );
       const data = await res.json();
@@ -46,10 +51,14 @@ async function askGemini(p) {
   add('J.A.R.V.I.S: Thinking...', 'ai');
   try {
     const reply = await callGemini(p);
-    chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply;
+    if (chat && chat.lastChild) {
+      chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply;
+    }
     speak(reply);
   } catch (e) {
-    chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR - ' + e.message;
+    if (chat && chat.lastChild) {
+      chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR - ' + e.message;
+    }
   }
 }
 
@@ -64,8 +73,12 @@ if (SR && micBtn) {
     askGemini(t);
   };
   micBtn.onclick = () => {
-    rec.start();
-    micBtn.innerText = 'LISTENING...';
+    try {
+      rec.start();
+      micBtn.innerText = 'LISTENING...';
+    } catch (err) {
+      console.error(err);
+    }
   };
   rec.onend = () => {
     micBtn.innerText = '🎙';
@@ -105,7 +118,7 @@ function handleSend() {
 }
 
 if (sendBtn) {
-  sendBtn.addEventListener('click', handleSend);
+  sendBtn.onclick = handleSend;
 }
 
 if (input) {
