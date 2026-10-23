@@ -1,8 +1,15 @@
 // ===== 1. API KEY SETUP =====
-let API_KEY = localStorage.getItem('jarvis_key');
+// API keys in frontend code are visible to visitors. For production, use a backend.
+let API_KEY = localStorage.getItem("jarvis_key");
+
 if (!API_KEY) {
-  API_KEY = prompt('Enter your Gemini API Key:');
-  if (API_KEY) localStorage.setItem('jarvis_key', API_KEY);
+  API_KEY = prompt("Enter your Gemini API Key:");
+  if (API_KEY && API_KEY.trim()) {
+    API_KEY = API_KEY.trim();
+    localStorage.setItem("jarvis_key", API_KEY);
+  } else {
+    API_KEY = "";
+  }
 }
 
 // ===== 2. MODEL DISCOVERY + FALLBACK =====
@@ -13,57 +20,90 @@ const MODEL_PREFERENCES = [
   "gemini-2.0-flash"
 ];
 
-const chat = document.getElementById('chat');
-const input = document.getElementById('msg');
-const micBtn = document.getElementById('mic-btn');
-const sendBtn = document.getElementById('send');
+const chat = document.getElementById("chat");
+const input = document.getElementById("msg");
+const micBtn = document.getElementById("mic-btn");
+const sendBtn = document.getElementById("send");
+
+async function readJson(response) {
+  const text = await response.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error("Gemini returned an invalid response.");
+  }
+}
 
 async function getAvailableModels() {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(API_KEY)}&pageSize=100`
-  );
-  const data = await response.json();
-
-  if (!response.ok || data.error) {
-    throw new Error(
-      data.error?.message || "Could not retrieve available Gemini models."
-    );
+  if (!API_KEY) {
+    throw new Error("Gemini API key is missing. Refresh the page and enter a valid key.");
   }
 
-  const models = (data.models || []).filter(model =>
-    model.supportedGenerationMethods?.includes("generateContent")
-  );
+  const models = [];
+  let pageToken = "";
+
+  do {
+    const url = new URL("https://generativelanguage.googleapis.com/v1beta/models");
+    url.searchParams.set("key", API_KEY);
+    url.searchParams.set("pageSize", "100");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+    const response = await fetch(url.toString());
+    const data = await readJson(response);
+
+    if (!response.ok || data.error) {
+      throw new Error(data.error?.message || `Could not list models (HTTP ${response.status}).`);
+    }
+
+    models.push(...(data.models || []));
+    pageToken = data.nextPageToken || "";
+  } while (pageToken);
 
   const usable = models
-    .filter(model => !/embedding|image|tts|audio|live|deprecated/i.test(model.name))
-    .map(model => model.name.replace(/^models\//, ""));
+    .filter(model =>
+      model.supportedGenerationMethods?.includes("generateContent") &&
+      !/embedding|image|tts|audio|live|deprecated/i.test(model.name || "")
+    )
+    .map(model => (model.name || "").replace(/^models\//, ""))
+    .filter(Boolean);
 
   const preferred = MODEL_PREFERENCES.filter(name => usable.includes(name));
   const otherFlash = usable.filter(name =>
     /flash/i.test(name) && !preferred.includes(name)
   );
+  const otherGemini = usable.filter(name =>
+    /gemini/i.test(name) &&
+    !/pro|image|audio|live|tts|embedding/i.test(name) &&
+    !preferred.includes(name) &&
+    !otherFlash.includes(name)
+  );
 
-  return [...new Set([...preferred, ...otherFlash])];
+  return [...new Set([...preferred, ...otherFlash, ...otherGemini])];
+}
+
+function isRetryableModelError(status, message) {
+  return status === 404 ||
+    status === 429 ||
+    status >= 500 ||
+    /high demand|temporar|quota|rate.?limit|unavailable|no longer available|deprecated|not found|overload/i.test(message);
 }
 
 // ===== 3. GEMINI BRAIN =====
-async function callGemini(p) {
-  if (!API_KEY) {
-    throw new Error("Gemini API key is missing. Refresh the page and enter a valid key.");
-  }
-
+async function callGemini(promptText) {
   const models = await getAvailableModels();
 
   if (!models.length) {
-    throw new Error("Your API key has no available text-generation models. Check Google AI Studio access.");
+    throw new Error("No compatible text-generation models were found for this API key.");
   }
 
-  let lastErr;
+  let lastError = null;
 
   for (const model of models) {
+    let response;
+
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(API_KEY)}`,
+      response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(API_KEY)}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -75,176 +115,154 @@ async function callGemini(p) {
             },
             contents: [{
               role: "user",
-              parts: [{ text: p }]
+              parts: [{ text: promptText }]
             }]
           })
         }
       );
-
-      const data = await response.json();
-
-      if (!response.ok || data.error) {
-        const message = data.error?.message || `HTTP ${response.status}`;
-        lastErr = new Error(message);
-
-        if (
-          response.status === 404 ||
-          response.status === 429 ||
-          /high demand|temporar|quota|rate|unavailable|no longer available|deprecated|not found/i.test(message)
-        ) {
-          continue;
-        }
-
-        // Do not keep trying models if the key is invalid or access is denied.
-        if (response.status === 400 || response.status === 401 || response.status === 403) {
-          throw lastErr;
-        }
-
-        continue;
-      }
-
-      const answer = (data.candidates?.[0]?.content?.parts || [])
-        .map(part => part.text || "")
-        .filter(Boolean)
-        .join("\n");
-
-      if (!answer) {
-        lastErr = new Error("The model returned no text. Try another request.");
-        continue;
-      }
-
-      return answer;
-    } catch (error) {
-      lastErr = error;
-
-      if (/Failed to fetch|NetworkError/i.test(error.message)) {
-        throw new Error("Network request failed. Check your connection and try again.");
-      }
-
-      if (/API key|permission|access denied|unauthorized|invalid argument/i.test(error.message)) {
-        throw error;
-      }
+    } catch {
+      throw new Error("Network request failed. Check your internet connection and try again.");
     }
+
+    const data = await readJson(response);
+
+    if (!response.ok || data.error) {
+      const message = data.error?.message || `HTTP ${response.status}`;
+      lastError = new Error(message);
+
+      if (isRetryableModelError(response.status, message)) {
+        continue;
+      }
+
+      throw lastError;
+    }
+
+    const answer = (data.candidates?.[0]?.content?.parts || [])
+      .map(part => part.text || "")
+      .filter(Boolean)
+      .join("\n");
+
+    if (answer) return answer;
+
+    lastError = new Error(
+      "The model returned no text. " +
+      (data.candidates?.[0]?.finishReason || "Try another request.")
+    );
   }
 
   throw new Error(
-    "All available Gemini text models failed or are busy. Please wait briefly and try again. Details: " +
-    (lastErr?.message || "No further details.")
+    "No available model could answer right now. Wait a little and try again. Details: " +
+    (lastError?.message || "No further details.")
   );
 }
 
-async function askGemini(p) {
-  add('J.A.R.V.I.S: Thinking...', 'ai');
+async function askGemini(promptText) {
+  const message = add("J.A.R.V.I.S: Thinking...", "ai");
 
   try {
-    const reply = await callGemini(p);
-
-    if (chat && chat.lastChild) {
-      chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply;
-    }
-
+    const reply = await callGemini(promptText);
+    if (message) message.innerText = "J.A.R.V.I.S: " + reply;
     speak(reply);
-  } catch (e) {
-    if (chat && chat.lastChild) {
-      chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR - ' + e.message;
-    }
+  } catch (error) {
+    if (message) message.innerText = "J.A.R.V.I.S: ERROR - " + error.message;
   }
 }
 
 // ===== 4. SPEECH RECOGNITION =====
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const SpeechRecognitionAPI =
+  window.SpeechRecognition || window.webkitSpeechRecognition;
 
-if (SR && micBtn) {
-  const rec = new SR();
-  rec.lang = 'en-US';
+if (SpeechRecognitionAPI && micBtn) {
+  const recognition = new SpeechRecognitionAPI();
+  recognition.lang = "en-US";
 
-  rec.onresult = (e) => {
-    const t = e.results[0][0].transcript;
-    add('YOU: ' + t, 'user');
-    askGemini(t);
+  recognition.onresult = event => {
+    const transcript = event.results[0][0].transcript;
+    add("YOU: " + transcript, "user");
+    askGemini(transcript);
   };
 
-  rec.onerror = (e) => {
-    add('J.A.R.V.I.S: Voice input error - ' + e.error, 'ai');
+  recognition.onerror = event => {
+    add("J.A.R.V.I.S: Voice input error - " + event.error, "ai");
   };
 
   micBtn.onclick = () => {
     try {
-      rec.start();
-      micBtn.innerText = 'LISTENING...';
-    } catch (err) {
-      console.error(err);
+      recognition.start();
+      micBtn.innerText = "LISTENING...";
+    } catch (error) {
+      console.error("Speech recognition:", error);
     }
   };
 
-  rec.onend = () => {
-    micBtn.innerText = '🎙';
+  recognition.onend = () => {
+    micBtn.innerText = "🎙";
   };
 } else if (micBtn) {
   micBtn.disabled = true;
-  micBtn.title = 'Voice input is not supported by this browser.';
+  micBtn.title = "Voice input is not supported by this browser.";
 }
 
 // ===== 5. TEXT-TO-SPEECH =====
 let voices = [];
 
 function loadVoices() {
-  if (typeof speechSynthesis !== 'undefined') {
-    voices = speechSynthesis.getVoices();
-  }
+  if ("speechSynthesis" in window) voices = speechSynthesis.getVoices();
 }
 
 loadVoices();
 
-if (typeof speechSynthesis !== 'undefined') {
+if ("speechSynthesis" in window) {
   speechSynthesis.onvoiceschanged = loadVoices;
 }
 
-function speak(t) {
-  if (typeof speechSynthesis === 'undefined') return;
-
-  const u = new SpeechSynthesisUtterance(t);
-  u.rate = 1.05;
-  u.pitch = 0.85;
-
-  const v = voices.find(v => v.lang.startsWith('en'));
-  if (v) u.voice = v;
+function speak(text) {
+  if (!("speechSynthesis" in window)) return;
 
   speechSynthesis.cancel();
-  speechSynthesis.speak(u);
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 1.05;
+  utterance.pitch = 0.85;
+
+  const voice = voices.find(item => item.lang && item.lang.startsWith("en"));
+  if (voice) utterance.voice = voice;
+
+  speechSynthesis.speak(utterance);
 }
 
-// ===== 6. SEND BUTTON & ENTER KEY ACTION =====
+// ===== 6. SEND BUTTON + ENTER KEY =====
 function handleSend() {
   if (!input) return;
 
-  const t = input.value.trim();
-  if (!t) return;
+  const text = input.value.trim();
+  if (!text) return;
 
-  add('YOU: ' + t, 'user');
-  input.value = '';
-  askGemini(t);
+  add("YOU: " + text, "user");
+  input.value = "";
+  askGemini(text);
 }
 
-if (sendBtn) {
-  sendBtn.onclick = handleSend;
-}
+if (sendBtn) sendBtn.onclick = handleSend;
 
 if (input) {
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
+  input.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
       handleSend();
     }
   });
 }
 
-function add(t, w) {
-  if (!chat) return;
+// ===== 7. CHAT MESSAGE HELPER =====
+function add(text, role) {
+  if (!chat) return null;
 
-  const d = document.createElement('div');
-  d.className = 'msg ' + w;
-  d.innerText = t;
-  chat.appendChild(d);
+  const element = document.createElement("div");
+  element.className = "msg " + role;
+  element.innerText = text;
+  chat.appendChild(element);
   chat.scrollTop = chat.scrollHeight;
+
+  return element;
 }
