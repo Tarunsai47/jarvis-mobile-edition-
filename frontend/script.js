@@ -5,12 +5,13 @@ if (!API_KEY) {
   if (API_KEY) localStorage.setItem('jarvis_key', API_KEY);
 }
 
-// ===== 2. SMART MODELS (Auto fallback) =====
+// ===== 2. SMART MODELS =====
 const MODELS = ["gemini-2.0-flash", "gemini-1.5-flash"];
 
 const chat = document.getElementById('chat');
 const input = document.getElementById('msg');
 const micBtn = document.getElementById('mic-btn');
+const sendBtn = document.getElementById('send');
 
 // ===== 3. GEMINI BRAIN =====
 async function callGemini(p) {
@@ -67,19 +68,24 @@ if (SR && micBtn) {
     micBtn.innerText = 'LISTENING...';
   };
   rec.onend = () => {
-    micBtn.innerText = '🎤';
+    micBtn.innerText = '🎙';
   };
 }
 
 // ===== 5. TEXT-TO-SPEECH =====
 let voices = [];
 function loadVoices() {
-  voices = speechSynthesis.getVoices();
+  if (typeof speechSynthesis !== 'undefined') {
+    voices = speechSynthesis.getVoices();
+  }
 }
 loadVoices();
-speechSynthesis.onvoiceschanged = loadVoices;
+if (typeof speechSynthesis !== 'undefined') {
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
 
 function speak(t) {
+  if (typeof speechSynthesis === 'undefined') return;
   const u = new SpeechSynthesisUtterance(t);
   u.rate = 1.05;
   u.pitch = 0.85;
@@ -88,19 +94,28 @@ function speak(t) {
   speechSynthesis.speak(u);
 }
 
-// ===== 6. TEXT SEND BUTTON =====
-const sendBtn = document.getElementById('send');
+// ===== 6. SEND BUTTON & ENTER KEY ACTION =====
+function handleSend() {
+  if (!input) return;
+  const t = input.value.trim();
+  if (!t) return;
+  add('YOU: ' + t, 'user');
+  input.value = '';
+  askGemini(t);
+}
+
 if (sendBtn) {
-  sendBtn.onclick = () => {
-    const t = input.value.trim();
-    if (!t) return;
-    add('YOU: ' + t, 'user');
-    input.value = '';
-    askGemini(t);
-  };
+  sendBtn.addEventListener('click', handleSend);
+}
+
+if (input) {
+  input.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleSend();
+  });
 }
 
 function add(t, w) {
+  if (!chat) return;
   const d = document.createElement('div');
   d.className = 'msg ' + w;
   d.innerText = t;
