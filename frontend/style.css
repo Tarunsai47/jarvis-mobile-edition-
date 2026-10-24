@@ -617,3 +617,191 @@ button:hover::after, button:focus-visible::after { left: 140%; }
     animation: none !important;
   }
 }
+
+
+/* ===== REFERENCE-INSPIRED ARC REACTOR: LAYERED CYAN + COPPER CORE ===== */
+.core {
+  width: min(76vw, 330px);
+  height: min(76vw, 330px);
+  margin: 46px auto 38px;
+  border-radius: 50%;
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle, rgba(220,255,255,.95) 0 8%, rgba(73,246,255,.9) 10% 13%, rgba(4,26,42,.98) 25% 34%, transparent 35%),
+    radial-gradient(circle, rgba(33,173,215,.22), transparent 68%);
+  box-shadow: 0 0 22px rgba(73,246,255,.28), 0 0 65px rgba(15,153,218,.15);
+  animation: reactorHover 5s ease-in-out infinite;
+}
+
+/* Fine concentric machined rings */
+.core::before {
+  inset: 3%;
+  border: 3px solid rgba(177,249,255,.95);
+  outline: 5px solid rgba(22,146,191,.45);
+  outline-offset: 5px;
+  box-shadow:
+    0 0 9px #8ff8ff,
+    0 0 25px rgba(73,246,255,.65),
+    inset 0 0 16px rgba(73,246,255,.45);
+  animation: reactorOuterSpin 18s linear infinite;
+}
+.core::after {
+  inset: 24%;
+  border: 7px double rgba(217,252,255,.95);
+  box-shadow:
+    0 0 8px rgba(73,246,255,.95),
+    0 0 20px rgba(73,246,255,.45),
+    inset 0 0 18px rgba(73,246,255,.3);
+  animation: reactorInnerSpin 12s linear infinite reverse, reactorRingPulse 2.8s ease-in-out infinite;
+}
+
+/* Copper winding blocks around the outside of the reactor */
+.reactor-coils {
+  position: absolute;
+  inset: 7%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from -5deg,
+    #f4a17b 0deg 1.2deg,
+    #a9412b 1.2deg 5.5deg,
+    #4a1b20 5.5deg 7deg,
+    transparent 7deg 39deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent 0 73%, #000 74% 91%, transparent 92%);
+  mask: radial-gradient(farthest-side, transparent 0 73%, #000 74% 91%, transparent 92%);
+  filter: drop-shadow(0 0 5px rgba(255,100,65,.75));
+  animation: coilSpin 24s linear infinite;
+  z-index: 1;
+}
+
+/* Eight bright segmented outer plates, similar to the supplied reactor reference */
+.reactor-plates {
+  position: absolute;
+  inset: -1%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(227,255,255,.98) 0deg 5deg,
+    rgba(75,219,255,.95) 5deg 10deg,
+    rgba(18,75,111,.9) 10deg 13deg,
+    transparent 13deg 41deg,
+    rgba(255,125,81,.9) 41deg 42deg,
+    transparent 42deg 45deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent 0 82%, #000 83% 94%, transparent 95%);
+  mask: radial-gradient(farthest-side, transparent 0 82%, #000 83% 94%, transparent 95%);
+  filter: drop-shadow(0 0 7px rgba(73,246,255,.9));
+  animation: plateSpin 32s linear infinite reverse, plateFlicker 4s ease-in-out infinite;
+  z-index: 2;
+}
+
+/* Bright inner turbine ring */
+.core .ring.r1 {
+  inset: 15%;
+  border: 4px solid transparent;
+  border-top-color: #f4ffff;
+  border-right-color: #66efff;
+  border-bottom-color: rgba(73,246,255,.5);
+  border-left-color: rgba(255,155,102,.8);
+  box-shadow: 0 0 12px rgba(73,246,255,.8), inset 0 0 12px rgba(73,246,255,.18);
+  animation: reactorOuterSpin 7s linear infinite;
+  z-index: 3;
+}
+.core .ring.r2 {
+  inset: 29%;
+  border: 5px solid transparent;
+  border-top-color: #e9ffff;
+  border-right-color: rgba(73,246,255,.95);
+  border-bottom-color: rgba(255,173,116,.95);
+  border-left-color: rgba(73,246,255,.5);
+  box-shadow: 0 0 12px rgba(73,246,255,.85), inset 0 0 10px rgba(73,246,255,.22);
+  animation: reactorInnerSpin 4s linear infinite reverse;
+  z-index: 4;
+}
+
+/* Honeycomb energy lattice in the center */
+.reactor-grid {
+  position: absolute;
+  inset: 37%;
+  border-radius: 50%;
+  z-index: 5;
+  border: 2px solid rgba(224,255,255,.95);
+  background-color: rgba(219,252,255,.92);
+  background-image:
+    linear-gradient(30deg, transparent 24%, rgba(77,170,190,.22) 25%, rgba(77,170,190,.22) 26%, transparent 27%, transparent 74%, rgba(77,170,190,.22) 75%, rgba(77,170,190,.22) 76%, transparent 77%),
+    linear-gradient(150deg, transparent 24%, rgba(77,170,190,.22) 25%, rgba(77,170,190,.22) 26%, transparent 27%, transparent 74%, rgba(77,170,190,.22) 75%, rgba(77,170,190,.22) 76%, transparent 77%),
+    linear-gradient(90deg, transparent 24%, rgba(77,170,190,.18) 25%, rgba(77,170,190,.18) 26%, transparent 27%, transparent 74%, rgba(77,170,190,.18) 75%, rgba(77,170,190,.18) 76%, transparent 77%);
+  background-size: 12px 21px;
+  box-shadow: 0 0 15px rgba(73,246,255,.9), inset 0 0 12px rgba(255,255,255,.95);
+  animation: latticeGlow 2.4s ease-in-out infinite;
+}
+
+/* Core itself becomes a brilliant white-cyan energy source */
+.core .center {
+  inset: 42%;
+  z-index: 6;
+  border: 2px solid #fff;
+  background: radial-gradient(circle at 42% 38%, #fff 0, #f2ffff 24%, #a8faff 52%, #3feaff 76%, #1188bd 100%);
+  box-shadow:
+    0 0 8px #fff,
+    0 0 20px #8af8ff,
+    0 0 40px rgba(73,246,255,.95),
+    0 0 72px rgba(20,171,255,.7),
+    inset 0 0 18px #fff;
+  animation: reactorPulse 1.7s ease-in-out infinite, coreSurge 4.5s ease-in-out infinite;
+}
+
+/* Keep orbital accents aligned to the new larger core */
+.orbit-a { inset: -7%; animation-duration: 15s; }
+.orbit-b { inset: -13%; animation-duration: 20s; }
+.reactor-tick { transform-origin: center calc(min(38vw, 165px)); }
+.tick-b { transform-origin: center calc(min(38vw, 165px)); }
+.dot-a { animation-name: reactorDotLargeA; }
+.dot-b { animation-name: reactorDotLargeB; }
+
+@keyframes reactorHover {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@keyframes reactorOuterSpin { to { transform: rotate(360deg); } }
+@keyframes reactorInnerSpin { to { transform: rotate(-360deg); } }
+@keyframes coilSpin { to { transform: rotate(360deg); } }
+@keyframes plateSpin { to { transform: rotate(360deg); } }
+@keyframes plateFlicker {
+  0%, 100% { opacity: .88; filter: drop-shadow(0 0 5px rgba(73,246,255,.65)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 12px rgba(73,246,255,1)); }
+}
+@keyframes reactorRingPulse {
+  0%, 100% { filter: brightness(.85); }
+  50% { filter: brightness(1.25); }
+}
+@keyframes latticeGlow {
+  0%, 100% { opacity: .82; box-shadow: 0 0 10px rgba(73,246,255,.6), inset 0 0 8px white; }
+  50% { opacity: 1; box-shadow: 0 0 24px rgba(73,246,255,1), inset 0 0 16px white; }
+}
+@keyframes coreSurge {
+  0%, 100% { filter: brightness(.92); }
+  48% { filter: brightness(1.22); }
+  52% { filter: brightness(1.55); }
+  56% { filter: brightness(1.02); }
+}
+@keyframes reactorDotLargeA {
+  from { transform: rotate(0deg) translateX(min(39vw, 170px)) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(min(39vw, 170px)) rotate(-360deg); }
+}
+@keyframes reactorDotLargeB {
+  from { transform: rotate(360deg) translateX(min(33vw, 145px)) rotate(-360deg); }
+  to { transform: rotate(0deg) translateX(min(33vw, 145px)) rotate(0deg); }
+}
+
+@media (max-width: 480px) {
+  .core { width: min(70vw, 280px); height: min(70vw, 280px); }
+  .reactor-tick { transform-origin: center calc(35vw); }
+  .tick-b { transform-origin: center calc(35vw); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reactor-coils, .reactor-plates, .reactor-grid, .core .ring, .core .center, .core::before, .core::after {
+    animation: none !important;
+  }
+}
