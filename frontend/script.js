@@ -8,11 +8,11 @@ function getJarvisBackendUrl() {
   if (!url) {
     url = String(prompt('Enter your deployed J.A.R.V.I.S backend URL (no API key):') || '').trim();
     if (url) {
-      url = url.replace(/\\/+$/, '');
+      url = url.replace(/\/+$/, '');
       try { localStorage.setItem('jarvis_backend_url', url); } catch (_) {}
     }
   }
-  return url.replace(/\\/+$/, '');
+  return url.replace(/\/+$/, '');
 }
 
 async function backendPost(path, body) {
