@@ -97,7 +97,7 @@ MEMORY.forEach(m => add((m.role === 'user' ? 'YOU: ' : 'J.A.R.V.I.S: ') + m.text
 // ===== 3. GEMINI BRAIN (MEMORY INTEGRATED) ===== 
 async function callGemini(p) {
   const contents = MEMORY.slice(-4).map(m => ({
-    role: m.role,
+    role: m.role === 'user' ? 'user' : 'model',
     parts: [{ text: m.text }]
   }));
   contents.push({ role: 'user', parts: [{ text: p }] });
@@ -391,6 +391,15 @@ if(sendBtn) {
     input.value = ''; 
     askGemini(t); 
   }; 
+}
+
+if (input) {
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      if (sendBtn) sendBtn.click();
+    }
+  });
 }
 
 if(clearBtn){ 
