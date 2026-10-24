@@ -95,42 +95,82 @@ const imgInput = document.getElementById('img-input');
 MEMORY.forEach(m => add((m.role === 'user' ? 'YOU: ' : 'J.A.R.V.I.S: ') + m.text, m.role === 'user' ? 'user' : 'ai')); 
 
 // ===== 3. GEMINI BRAIN (MEMORY INTEGRATED) ===== 
-async function callGemini(p) { 
-  const contents = MEMORY.slice(-8).map(m => ({role: m.role, parts: [{text: m.text}]})); 
-  contents.push({role: 'user', parts: [{text: p}]}); 
+async function callGemini(p) {
+  const contents = MEMORY.slice(-6).map(m => ({
+    role: m.role,
+    parts: [{ text: m.text }]
+  }));
+  contents.push({ role: 'user', parts: [{ text: p }] });
 
-  let lastErr; 
-  const models = (await getAvailableModels()).slice(0, 3);
-  for (const m of models) { 
+  // Try the last successful model first, so repeat requests avoid fallback delays.
+  const lastWorkingKey = 'jarvis_last_working_model_v1';
+  const savedModel = localStorage.getItem(lastWorkingKey);
+  const discovered = await getAvailableModels();
+  const models = [
+    ...(savedModel && discovered.includes(savedModel) ? [savedModel] : []),
+    ...discovered.filter(name => name !== savedModel)
+  ].slice(0, 3);
+
+  let lastErr;
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 18000);
-    try { 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${API_KEY}`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        signal: controller.signal,
-        body: JSON.stringify({contents: contents})
-      }); 
-      
-      const data = await res.json(); 
-      if(data.error){ 
-        lastErr = new Error(data.error.message); 
-        if(/high demand|temporar|quota|rate|unavailable|deprecated|not found|not supported|no longer available|overload/i.test(data.error.message) || res.status === 404 || res.status === 429 || res.status >= 500) continue; 
-        throw lastErr; 
-      } 
-      const answer = (data.candidates?.[0]?.content?.parts || []).map(part => part.text || '').filter(Boolean).join('\n');
-      if(answer) return answer;
-      lastErr = new Error(data.candidates?.[0]?.finishReason || 'Model returned no text.'); 
-    } catch(e){ 
-      lastErr = e.name === "AbortError"
-        ? new Error("Request timed out after 18 seconds. Please try again.")
-        : e; 
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(API_KEY)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents,
+            generationConfig: { temperature: 0.7, maxOutputTokens: 700 }
+          })
+        }
+      );
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        const message = data.error?.message || `HTTP ${res.status}`;
+        lastErr = new Error(message);
+        const canRetry = res.status === 404 || res.status === 429 || res.status >= 500 ||
+          /high demand|temporar|quota|rate|unavailable|deprecated|not found|not supported|no longer available|overload/i.test(message);
+        if (canRetry && i < models.length - 1) continue;
+        throw lastErr;
+      }
+
+      const answer = (data.candidates?.[0]?.content?.parts || [])
+        .map(part => part.text || '')
+        .filter(Boolean)
+        .join('\n');
+
+      if (answer) {
+        try { localStorage.setItem(lastWorkingKey, model); } catch (_) {}
+        return answer;
+      }
+      lastErr = new Error(data.candidates?.[0]?.finishReason || 'The model returned no text.');
+      if (i < models.length - 1) continue;
+      throw lastErr;
+    } catch (e) {
+      lastErr = e.name === 'AbortError'
+        ? new Error('This model took longer than 12 seconds. Please try again.')
+        : e;
+      if (e.name === 'AbortError' && i < models.length - 1) continue;
+      if (i < models.length - 1 && /Failed to fetch|NetworkError/i.test(e.message || '')) {
+        throw new Error('Network request failed. Check your connection and try again.');
+      }
+      if (i === models.length - 1 || !(/high demand|temporar|quota|rate|unavailable|deprecated|not found|not supported|no longer available|overload/i.test(e.message || ''))) {
+        throw lastErr;
+      }
     } finally {
       clearTimeout(timeoutId);
     }
-  } 
-  throw lastErr || new Error("No compatible Gemini model responded.");
-} 
+  }
+
+  throw lastErr || new Error('No compatible Gemini model responded.');
+}
 
 let jarvisBusy = false;
 async function askGemini(p) {
