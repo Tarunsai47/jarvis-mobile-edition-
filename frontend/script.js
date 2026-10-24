@@ -15,10 +15,20 @@ const MODEL_PREFERENCES = [
 ];
 
 let availableModelsCache = null;
+const MODEL_CACHE_KEY = "jarvis_models_cache_v1";
 
 async function getAvailableModels() {
   if (!API_KEY) throw new Error("Gemini API key is missing. Refresh the page and enter a valid key.");
   if (availableModelsCache) return availableModelsCache;
+
+  // Reuse the last successful model list so normal chats don't repeatedly discover models.
+  try {
+    const saved = JSON.parse(localStorage.getItem(MODEL_CACHE_KEY) || "null");
+    if (Array.isArray(saved) && saved.length) {
+      availableModelsCache = saved;
+      return saved;
+    }
+  } catch (_) {}
 
   const allModels = [];
   let pageToken = "";
@@ -63,6 +73,9 @@ async function getAvailableModels() {
     throw new Error("Google returned no models supporting generateContent for this API key.");
   }
 
+  // Keep the fallback list short to avoid slow serial retries.
+  availableModelsCache = availableModelsCache.slice(0, 4);
+  try { localStorage.setItem(MODEL_CACHE_KEY, JSON.stringify(availableModelsCache)); } catch (_) {}
   return availableModelsCache;
 }
 
@@ -82,16 +95,20 @@ const imgInput = document.getElementById('img-input');
 MEMORY.forEach(m => add((m.role === 'user' ? 'YOU: ' : 'J.A.R.V.I.S: ') + m.text, m.role === 'user' ? 'user' : 'ai')); 
 
 // ===== 3. GEMINI BRAIN (MEMORY INTEGRATED) ===== 
-async function callGemini(p){ 
-  const contents = MEMORY.slice(-12).map(m => ({role: m.role, parts: [{text: m.text}]})); 
+async function callGemini(p) { 
+  const contents = MEMORY.slice(-8).map(m => ({role: m.role, parts: [{text: m.text}]})); 
   contents.push({role: 'user', parts: [{text: p}]}); 
 
   let lastErr; 
-  for(const m of await getAvailableModels()){ 
+  const models = (await getAvailableModels()).slice(0, 3);
+  for (const m of models) { 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 18000);
     try { 
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${API_KEY}`, {
         method: "POST",
         headers: {"Content-Type": "application/json"},
+        signal: controller.signal,
         body: JSON.stringify({contents: contents})
       }); 
       
@@ -105,24 +122,35 @@ async function callGemini(p){
       if(answer) return answer;
       lastErr = new Error(data.candidates?.[0]?.finishReason || 'Model returned no text.'); 
     } catch(e){ 
-      lastErr = e; 
-    } 
+      lastErr = e.name === "AbortError"
+        ? new Error("Request timed out after 18 seconds. Please try again.")
+        : e; 
+    } finally {
+      clearTimeout(timeoutId);
+    }
   } 
-  throw lastErr; 
+  throw lastErr || new Error("No compatible Gemini model responded.");
 } 
 
-async function askGemini(p){ 
-  add('J.A.R.V.I.S: Thinking...', 'ai'); 
+let jarvisBusy = false;
+async function askGemini(p) {
+  if (jarvisBusy) return;
+  jarvisBusy = true;
+  if (sendBtn) sendBtn.disabled = true;
+  const thinkingMessage = add('J.A.R.V.I.S: Thinking...', 'ai');
   try { 
     const reply = await callGemini(p); 
     MEMORY.push({role: 'user', text: p}); 
     MEMORY.push({role: 'model', text: reply}); 
     saveMemory(); 
-    chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply; 
+    if (thinkingMessage) thinkingMessage.innerText = 'J.A.R.V.I.S: ' + reply;
     speak(reply); 
   } catch(e){ 
-    chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR - ' + e.message; 
-  } 
+    if (thinkingMessage) thinkingMessage.innerText = 'J.A.R.V.I.S: ERROR - ' + e.message; 
+  } finally {
+    jarvisBusy = false;
+    if (sendBtn) sendBtn.disabled = false;
+  }
 } 
 
 // ===== 4. VISION ENGINE (EYES) ===== 
@@ -217,7 +245,7 @@ const sendBtn = document.getElementById('send');
 if(sendBtn) {
   sendBtn.onclick = () => { 
     const t = input.value.trim(); 
-    if(!t) return; 
+    if(!t || jarvisBusy) return; 
     add('YOU: ' + t, 'user'); 
     input.value = ''; 
     askGemini(t); 
