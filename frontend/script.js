@@ -225,21 +225,113 @@ if(SR && micBtn){
   }; 
 } 
 
-let voices = []; 
-function loadVoices(){ 
-  voices = speechSynthesis.getVoices(); 
-} 
-loadVoices(); 
-speechSynthesis.onvoiceschanged = loadVoices; 
+// ===== VOICE SELECTION: TONY STARK-INSPIRED =====
+const voiceSelect = document.getElementById('jarvis-voice');
+const testVoiceBtn = document.getElementById('test-voice');
+const voiceStatus = document.getElementById('voice-status');
+const SAVED_VOICE_KEY = 'jarvis_selected_voice_v1';
+let voices = [];
+let selectedVoiceURI = localStorage.getItem(SAVED_VOICE_KEY) || '';
 
-function speak(t){ 
-  const u = new SpeechSynthesisUtterance(t); 
-  u.rate = 1.05; 
-  u.pitch = 0.85; 
-  const v = voices.find(v => v.lang.startsWith('en')); 
-  if(v) u.voice = v; 
-  speechSynthesis.speak(u); 
-} 
+function loadVoices() {
+  if (typeof speechSynthesis === 'undefined') {
+    if (voiceStatus) voiceStatus.textContent = 'Speech synthesis is not supported in this browser.';
+    if (voiceSelect) voiceSelect.disabled = true;
+    if (testVoiceBtn) testVoiceBtn.disabled = true;
+    return;
+  }
+
+  voices = speechSynthesis.getVoices() || [];
+  if (!voiceSelect) return;
+
+  const previous = selectedVoiceURI || voiceSelect.value;
+  voiceSelect.innerHTML = '';
+
+  const englishVoices = voices.filter(v => /^en(-|$)/i.test(v.lang));
+  const choices = englishVoices.length ? englishVoices : voices;
+
+  if (!choices.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No browser voices available';
+    voiceSelect.appendChild(option);
+    voiceSelect.disabled = true;
+    if (voiceStatus) voiceStatus.textContent = 'No voices are available yet. Try reopening this page or enabling text-to-speech voices in your device settings.';
+    return;
+  }
+
+  voiceSelect.disabled = false;
+  choices.forEach(v => {
+    const option = document.createElement('option');
+    option.value = v.voiceURI;
+    const label = v.name + ' (' + v.lang + ')' + (v.default ? ' — default' : '');
+    option.textContent = label;
+    voiceSelect.appendChild(option);
+  });
+
+  const preferred = choices.find(v => v.voiceURI === previous)
+    || choices.find(v => /en-GB/i.test(v.lang) && /male|daniel|arthur|oliver|george|ryan/i.test(v.name))
+    || choices.find(v => /en-GB/i.test(v.lang))
+    || choices.find(v => /^en/i.test(v.lang))
+    || choices[0];
+
+  voiceSelect.value = preferred.voiceURI;
+  selectedVoiceURI = preferred.voiceURI;
+  try { localStorage.setItem(SAVED_VOICE_KEY, selectedVoiceURI); } catch (_) {}
+
+  if (voiceStatus) {
+    voiceStatus.textContent = 'Using ' + preferred.name + '. Choose another available voice and tap TEST VOICE to preview it.';
+  }
+}
+
+if (typeof speechSynthesis !== 'undefined') {
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+if (voiceSelect) {
+  voiceSelect.addEventListener('change', () => {
+    selectedVoiceURI = voiceSelect.value;
+    try { localStorage.setItem(SAVED_VOICE_KEY, selectedVoiceURI); } catch (_) {}
+    const chosen = voices.find(v => v.voiceURI === selectedVoiceURI);
+    if (voiceStatus) voiceStatus.textContent = chosen
+      ? 'Selected: ' + chosen.name + '. Tap TEST VOICE to hear a preview.'
+      : 'This voice is not currently available.';
+  });
+}
+
+function speak(t) {
+  if (typeof speechSynthesis === 'undefined') {
+    if (voiceStatus) voiceStatus.textContent = 'Text-to-speech is not supported in this browser.';
+    return;
+  }
+  const chosen = voices.find(v => v.voiceURI === (voiceSelect ? voiceSelect.value : selectedVoiceURI));
+  if (!chosen) {
+    if (voiceStatus) voiceStatus.textContent = 'The selected voice is unavailable. Choose a voice from the list.';
+    return;
+  }
+
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(t);
+  u.voice = chosen;
+  u.lang = chosen.lang || 'en-US';
+  u.rate = 0.98;
+  u.pitch = 0.96;
+  u.volume = 1;
+  speechSynthesis.speak(u);
+}
+
+if (testVoiceBtn) {
+  testVoiceBtn.addEventListener('click', () => {
+    const chosen = voices.find(v => v.voiceURI === (voiceSelect ? voiceSelect.value : selectedVoiceURI));
+    if (!chosen) {
+      if (voiceStatus) voiceStatus.textContent = 'No selected voice is available. Check your device/browser speech voices.';
+      return;
+    }
+    speak("Hello, sir. All systems are online. How may I assist you today?");
+    if (voiceStatus) voiceStatus.textContent = 'Previewing ' + chosen.name + ' (' + chosen.lang + '). The exact sound depends on your device.';
+  });
+}
 
 const sendBtn = document.getElementById('send');
 if(sendBtn) {
