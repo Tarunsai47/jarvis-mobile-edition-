@@ -252,4 +252,5 @@ function add(t, w){
   d.innerText = t;
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
+  return d;
 }
