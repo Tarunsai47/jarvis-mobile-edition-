@@ -1,15 +1,15 @@
-// ===== 1. API KEY & SMART MODELS =====
+ // ===== 1. API KEY & SMART MODELS =====
 let API_KEY = localStorage.getItem('jarvis_key');
 if(!API_KEY) { 
   API_KEY = prompt('Enter your Gemini API Key:'); 
   if(API_KEY) localStorage.setItem('jarvis_key', API_KEY); 
 } 
 
-// Updated with valid and active Gemini API model identifiers:
+// Valid Gemini API model names:
 const MODELS = [
   "gemini-2.5-flash",
   "gemini-2.0-flash",
-  "gemini-1.5-flash-latest"
+  "gemini-1.5-flash"
 ];
 
 // ===== 2. MEMORY SYSTEM =====
