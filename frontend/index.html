@@ -40,6 +40,15 @@
   
   <div class="chat" id="chat"></div>
   
+  <section class="voice-settings" aria-label="JARVIS voice settings">
+    <label for="jarvis-voice">J.A.R.V.I.S VOICE</label>
+    <select id="jarvis-voice" aria-label="Choose assistant voice">
+      <option value="">Loading available voices...</option>
+    </select>
+    <button type="button" id="test-voice">TEST VOICE</button>
+    <p id="voice-status" role="status">Choose a voice and test it.</p>
+  </section>
+
   <div class="input-area">
     <input id="msg" placeholder="Ask J.A.R.V.I.S...">
     <button id="send">SEND</button>
@@ -50,6 +59,6 @@
   </div>
 
   <!-- JavaScript linked properly at the end of the body -->
-  <script src="./script.js?v=20261024fastreply" defer></script>
+  <script src="./script.js?v=20261024voicechoice" defer></script>
 </body>
 </html>
