@@ -805,3 +805,40 @@ button:hover::after, button:focus-visible::after { left: 140%; }
     animation: none !important;
   }
 }
+
+
+/* ===== VOICE SELECTOR ===== */
+.voice-settings {
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid rgba(73,246,255,.48);
+  background: rgba(2,18,22,.82);
+  box-shadow: 0 0 15px rgba(73,246,255,.08), inset 0 0 18px rgba(73,246,255,.035);
+  display: grid;
+  gap: 9px;
+}
+.voice-settings label {
+  color: var(--cyan, #49f6ff);
+  letter-spacing: 2px;
+  font-size: .88rem;
+  font-weight: bold;
+}
+.voice-settings select {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--cyan, #49f6ff);
+  border-radius: 2px;
+  background: #031114;
+  color: #eaffff;
+  font: inherit;
+}
+.voice-settings button {
+  margin-top: 0;
+}
+#voice-status {
+  margin: 0;
+  font-size: .82rem;
+  color: #a8d8dd;
+  line-height: 1.5;
+}
