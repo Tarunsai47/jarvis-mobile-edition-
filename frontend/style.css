@@ -442,3 +442,178 @@ button:hover::after, button:focus-visible::after { left: 140%; }
     transition: none !important;
   }
 }
+
+
+/* ===== ARC REACTOR: CINEMATIC ENERGY ANIMATION ===== */
+.core {
+  perspective: 800px;
+  transform-style: preserve-3d;
+  isolation: isolate;
+  filter: drop-shadow(0 0 18px rgba(255, 128, 30, .25));
+}
+
+.reactor-orbit {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  inset: -18px;
+  border: 1px solid transparent;
+  z-index: -1;
+}
+
+.orbit-a {
+  border-top: 2px solid #ffe8ad;
+  border-right: 2px solid rgba(255, 177, 69, .8);
+  border-bottom: 1px dashed rgba(255, 76, 48, .75);
+  border-left: 1px dashed rgba(73, 246, 255, .6);
+  box-shadow: 0 0 12px rgba(255, 159, 47, .25);
+  animation: reactorOrbitA 9s linear infinite;
+}
+
+.orbit-b {
+  inset: -28px;
+  border-top: 1px dashed rgba(73, 246, 255, .8);
+  border-right: 2px solid rgba(73, 246, 255, .45);
+  border-bottom: 2px solid rgba(255, 189, 85, .55);
+  border-left: 1px solid rgba(255, 74, 66, .6);
+  animation: reactorOrbitB 13s linear infinite;
+}
+
+@keyframes reactorOrbitA {
+  from { transform: rotateX(62deg) rotateZ(0deg); }
+  to { transform: rotateX(62deg) rotateZ(360deg); }
+}
+@keyframes reactorOrbitB {
+  from { transform: rotateY(62deg) rotateZ(360deg); }
+  to { transform: rotateY(62deg) rotateZ(0deg); }
+}
+
+.reactor-tick {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 15px;
+  transform-origin: center 105px;
+  background: linear-gradient(to bottom, var(--gold-bright), transparent);
+  box-shadow: 0 0 8px var(--gold);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.tick-a {
+  animation: tickRotate 6s linear infinite;
+}
+.tick-b {
+  height: 9px;
+  transform-origin: center 105px;
+  background: var(--cyan);
+  box-shadow: 0 0 9px var(--cyan);
+  animation: tickRotate 3.5s linear infinite reverse;
+}
+@keyframes tickRotate {
+  from { transform: translateX(-50%) rotate(0deg); }
+  to { transform: translateX(-50%) rotate(360deg); }
+}
+
+.reactor-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  z-index: 6;
+  pointer-events: none;
+}
+.dot-a {
+  background: #fff1bd;
+  box-shadow: 0 0 8px #fff1bd, 0 0 17px var(--gold);
+  animation: dotOrbitA 4.5s linear infinite;
+}
+.dot-b {
+  width: 5px;
+  height: 5px;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan), 0 0 15px var(--cyan);
+  animation: dotOrbitB 3.2s linear infinite;
+}
+@keyframes dotOrbitA {
+  from { transform: rotate(0deg) translateX(112px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(112px) rotate(-360deg); }
+}
+@keyframes dotOrbitB {
+  from { transform: rotate(360deg) translateX(88px) rotate(-360deg); }
+  to { transform: rotate(0deg) translateX(88px) rotate(0deg); }
+}
+
+/* Reactor core pulses with a warm inner light and cyan energy halo */
+.core .center {
+  background:
+    radial-gradient(circle at 34% 28%, #fffbe3 0, #ffe3a0 10%, #ffb23f 25%, #ff6b24 49%, #9b260d 72%, #250a06 100%);
+  border: 2px solid #fff0bd;
+  box-shadow:
+    0 0 8px #fff0bd,
+    0 0 18px #ffad36,
+    0 0 38px rgba(255, 91, 24, .9),
+    0 0 58px rgba(255, 57, 23, .35),
+    0 0 72px rgba(73, 246, 255, .22),
+    inset 0 0 12px rgba(255, 255, 220, .7);
+  animation: reactorPulse 1.8s ease-in-out infinite, reactorCoreFlash 5s ease-in-out infinite;
+}
+
+@keyframes reactorCoreFlash {
+  0%, 100% { filter: brightness(1); }
+  45% { filter: brightness(1.3); }
+  50% { filter: brightness(1.55); }
+  54% { filter: brightness(1.1); }
+}
+
+/* Short energy sweep arcs spin at different speeds */
+.core .ring.r1 {
+  animation: spin 5.5s linear infinite;
+  box-shadow: 0 0 14px rgba(255, 165, 55, .55), inset 0 0 10px rgba(255, 165, 55, .12);
+}
+.core .ring.r2 {
+  animation: spin 3.4s linear infinite reverse;
+  box-shadow: 0 0 15px rgba(73, 246, 255, .5), inset 0 0 12px rgba(73, 246, 255, .1);
+}
+
+.core::before {
+  inset: -8px;
+  border: 1px dashed rgba(255, 209, 124, .78);
+  box-shadow: 0 0 14px rgba(255, 152, 39, .28);
+  animation: spin 17s linear infinite reverse;
+}
+
+.core::after {
+  inset: 7px;
+  border-color: rgba(73, 246, 255, .75);
+  box-shadow: inset 0 0 22px rgba(73, 246, 255, .12), 0 0 16px rgba(73, 246, 255, .25);
+  animation: reactorHalo 2.6s ease-in-out infinite;
+}
+@keyframes reactorHalo {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+
+@media (max-width: 480px) {
+  .reactor-tick { transform-origin: center 91px; }
+  .tick-b { transform-origin: center 91px; }
+  .dot-a { animation-name: dotOrbitMobileA; }
+  .dot-b { animation-name: dotOrbitMobileB; }
+  @keyframes dotOrbitMobileA {
+    from { transform: rotate(0deg) translateX(96px) rotate(0deg); }
+    to { transform: rotate(360deg) translateX(96px) rotate(-360deg); }
+  }
+  @keyframes dotOrbitMobileB {
+    from { transform: rotate(360deg) translateX(76px) rotate(-360deg); }
+    to { transform: rotate(0deg) translateX(76px) rotate(0deg); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reactor-orbit, .reactor-tick, .reactor-dot, .core::after {
+    animation: none !important;
+  }
+}
