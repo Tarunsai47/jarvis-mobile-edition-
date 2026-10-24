@@ -192,12 +192,25 @@ async function callGemini(p) {
 // ===== CHAT RESPONSE HANDLER =====
 let jarvisBusy = false;
 
+function friendlyApiError(err) {
+  const message = String(err?.message || err || 'Please try again.');
+  if (/quota exceeded|free_tier|requests per day limit exceeded|rate limit/i.test(message)) {
+    const retryMatch = message.match(/retry in ([^.\\n]+)/i);
+    const retryText = retryMatch ? retryMatch[1].trim() : 'after your quota resets';
+    return 'I have reached the Gemini API free-tier request limit. Please try again in ' + retryText +
+      ', or check your usage and billing at ai.dev/rate-limit. This is a Google API quota limit, not a J.A.R.V.I.S button error.';
+  }
+  if (/api key not valid|invalid api key|permission denied|unauthenticated/i.test(message)) {
+    return 'The Gemini API key may be invalid or lack access. Check your key in Google AI Studio and update it in J.A.R.V.I.S.';
+  }
+  return message;
+}
+
 async function askGemini(promptText) {
   if (jarvisBusy) return;
   jarvisBusy = true;
   if (sendBtn) sendBtn.disabled = true;
 
-  // Keep recent conversation context for the next request.
   MEMORY.push({ role: 'user', text: promptText });
   try {
     const reply = await callGemini(promptText);
@@ -207,7 +220,7 @@ async function askGemini(promptText) {
     add('J.A.R.V.I.S: ' + reply, 'ai');
     speak(reply);
   } catch (err) {
-    add('J.A.R.V.I.S: Sorry, I could not respond. ' + (err?.message || 'Please try again.'), 'ai');
+    add('J.A.R.V.I.S: ' + friendlyApiError(err), 'ai');
   } finally {
     jarvisBusy = false;
     if (sendBtn) sendBtn.disabled = false;
@@ -264,7 +277,7 @@ async function askVision(base64, mime, q){
       lastErr = e; 
     } 
   } 
-  chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR - ' + lastErr.message; 
+  chat.lastChild.innerText = 'J.A.R.V.I.S: ' + friendlyApiError(lastErr); 
 } 
 
 // ===== 5. VOICE & UTILS ===== 
