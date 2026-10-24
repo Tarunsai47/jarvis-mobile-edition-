@@ -96,26 +96,23 @@ MEMORY.forEach(m => add((m.role === 'user' ? 'YOU: ' : 'J.A.R.V.I.S: ') + m.text
 
 // ===== 3. GEMINI BRAIN (MEMORY INTEGRATED) ===== 
 async function callGemini(p) {
-  const contents = MEMORY.slice(-6).map(m => ({
+  const contents = MEMORY.slice(-4).map(m => ({
     role: m.role,
     parts: [{ text: m.text }]
   }));
   contents.push({ role: 'user', parts: [{ text: p }] });
 
-  // Try the last successful model first, so repeat requests avoid fallback delays.
   const lastWorkingKey = 'jarvis_last_working_model_v1';
   const savedModel = localStorage.getItem(lastWorkingKey);
-  const discovered = await getAvailableModels();
-  const models = [
-    ...(savedModel && discovered.includes(savedModel) ? [savedModel] : []),
-    ...discovered.filter(name => name !== savedModel)
-  ].slice(0, 3);
-
+  let models = savedModel ? [savedModel] : await getAvailableModels();
   let lastErr;
+
+  // Fast path: immediately use the last model that successfully answered.
+  // Only discover/try alternatives if that model fails.
   for (let i = 0; i < models.length; i++) {
     const model = models[i];
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
 
     try {
       const res = await fetch(
@@ -126,7 +123,7 @@ async function callGemini(p) {
           signal: controller.signal,
           body: JSON.stringify({
             contents,
-            generationConfig: { temperature: 0.7, maxOutputTokens: 700 }
+            generationConfig: { temperature: 0.5, maxOutputTokens: 400 }
           })
         }
       );
@@ -137,6 +134,14 @@ async function callGemini(p) {
         lastErr = new Error(message);
         const canRetry = res.status === 404 || res.status === 429 || res.status >= 500 ||
           /high demand|temporar|quota|rate|unavailable|deprecated|not found|not supported|no longer available|overload/i.test(message);
+
+        // If the saved model fails, discover compatible alternatives once.
+        if (savedModel && i === 0 && canRetry) {
+          const discovered = await getAvailableModels();
+          models = discovered.filter(name => name !== savedModel).slice(0, 2);
+          i = -1;
+          continue;
+        }
         if (canRetry && i < models.length - 1) continue;
         throw lastErr;
       }
@@ -150,20 +155,28 @@ async function callGemini(p) {
         try { localStorage.setItem(lastWorkingKey, model); } catch (_) {}
         return answer;
       }
+
       lastErr = new Error(data.candidates?.[0]?.finishReason || 'The model returned no text.');
+      if (savedModel && i === 0) {
+        const discovered = await getAvailableModels();
+        models = discovered.filter(name => name !== savedModel).slice(0, 2);
+        i = -1;
+        continue;
+      }
       if (i < models.length - 1) continue;
       throw lastErr;
-    } catch (e) {
-      lastErr = e.name === 'AbortError'
-        ? new Error('This model took longer than 12 seconds. Please try again.')
-        : e;
-      if (e.name === 'AbortError' && i < models.length - 1) continue;
-      if (i < models.length - 1 && /Failed to fetch|NetworkError/i.test(e.message || '')) {
-        throw new Error('Network request failed. Check your connection and try again.');
+    } catch (err) {
+      lastErr = err.name === 'AbortError'
+        ? new Error('J.A.R.V.I.S timed out. Please try again.')
+        : err;
+      if (savedModel && i === 0 && !/timed out/i.test(lastErr.message)) {
+        const discovered = await getAvailableModels();
+        models = discovered.filter(name => name !== savedModel).slice(0, 2);
+        i = -1;
+        continue;
       }
-      if (i === models.length - 1 || !(/high demand|temporar|quota|rate|unavailable|deprecated|not found|not supported|no longer available|overload/i.test(e.message || ''))) {
-        throw lastErr;
-      }
+      if (i < models.length - 1) continue;
+      throw lastErr;
     } finally {
       clearTimeout(timeoutId);
     }
@@ -171,27 +184,6 @@ async function callGemini(p) {
 
   throw lastErr || new Error('No compatible Gemini model responded.');
 }
-
-let jarvisBusy = false;
-async function askGemini(p) {
-  if (jarvisBusy) return;
-  jarvisBusy = true;
-  if (sendBtn) sendBtn.disabled = true;
-  const thinkingMessage = add('J.A.R.V.I.S: Thinking...', 'ai');
-  try { 
-    const reply = await callGemini(p); 
-    MEMORY.push({role: 'user', text: p}); 
-    MEMORY.push({role: 'model', text: reply}); 
-    saveMemory(); 
-    if (thinkingMessage) thinkingMessage.innerText = 'J.A.R.V.I.S: ' + reply;
-    speak(reply); 
-  } catch(e){ 
-    if (thinkingMessage) thinkingMessage.innerText = 'J.A.R.V.I.S: ERROR - ' + e.message; 
-  } finally {
-    jarvisBusy = false;
-    if (sendBtn) sendBtn.disabled = false;
-  }
-} 
 
 // ===== 4. VISION ENGINE (EYES) ===== 
 if(camBtn && imgInput){ 
