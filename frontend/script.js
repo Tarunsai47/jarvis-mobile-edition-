@@ -5,14 +5,66 @@ if(!API_KEY) {
   if(API_KEY) localStorage.setItem('jarvis_key', API_KEY); 
 } 
 
-// Valid Gemini API model names:
-const MODELS = [
-  // Try newer models first. Older unsupported models are intentionally excluded.
+// ===== MODEL DISCOVERY =====
+// Use the models actually enabled for this API key instead of hard-coding retired IDs.
+const MODEL_PREFERENCES = [
   "gemini-3.8-flash",
   "gemini-2.5-flash-lite",
   "gemini-2.5-flash",
   "gemini-2.0-flash"
 ];
+
+let availableModelsCache = null;
+
+async function getAvailableModels() {
+  if (!API_KEY) throw new Error("Gemini API key is missing. Refresh the page and enter a valid key.");
+  if (availableModelsCache) return availableModelsCache;
+
+  const allModels = [];
+  let pageToken = "";
+
+  do {
+    const url = new URL("https://generativelanguage.googleapis.com/v1beta/models");
+    url.searchParams.set("key", API_KEY);
+    url.searchParams.set("pageSize", "100");
+    if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+    const response = await fetch(url.toString());
+    const data = await response.json();
+
+    if (!response.ok || data.error) {
+      throw new Error(data.error?.message || `Could not list models (HTTP ${response.status}).`);
+    }
+
+    allModels.push(...(data.models || []));
+    pageToken = data.nextPageToken || "";
+  } while (pageToken);
+
+  const supported = allModels
+    .filter(model =>
+      model.supportedGenerationMethods?.includes("generateContent") &&
+      !/embedding|image|tts|audio|live|deprecated/i.test(model.name || "")
+    )
+    .map(model => (model.name || "").replace(/^models\//, ""))
+    .filter(Boolean);
+
+  const preferred = MODEL_PREFERENCES.filter(name => supported.includes(name));
+  const otherFlash = supported.filter(name => /flash/i.test(name) && !preferred.includes(name));
+  const otherText = supported.filter(name =>
+    /gemini/i.test(name) &&
+    !/image|audio|live|tts|embedding/i.test(name) &&
+    !preferred.includes(name) &&
+    !otherFlash.includes(name)
+  );
+
+  availableModelsCache = [...new Set([...preferred, ...otherFlash, ...otherText])];
+
+  if (!availableModelsCache.length) {
+    throw new Error("Google returned no models supporting generateContent for this API key.");
+  }
+
+  return availableModelsCache;
+}
 
 // ===== 2. MEMORY SYSTEM =====
 let MEMORY = JSON.parse(localStorage.getItem('jarvis_memory') || '[]'); 
@@ -35,7 +87,7 @@ async function callGemini(p){
   contents.push({role: 'user', parts: [{text: p}]}); 
 
   let lastErr; 
-  for(const m of MODELS){ 
+  for(const m of await getAvailableModels()){ 
     try { 
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${API_KEY}`, {
         method: "POST",
@@ -46,10 +98,12 @@ async function callGemini(p){
       const data = await res.json(); 
       if(data.error){ 
         lastErr = new Error(data.error.message); 
-        if(/high demand|temporar|quota|rate|unavailable|deprecated|not found|not supported|no longer available/i.test(data.error.message)) continue; 
+        if(/high demand|temporar|quota|rate|unavailable|deprecated|not found|not supported|no longer available|overload/i.test(data.error.message) || res.status === 404 || res.status === 429 || res.status >= 500) continue; 
         throw lastErr; 
       } 
-      return data.candidates[0].content.parts[0].text; 
+      const answer = (data.candidates?.[0]?.content?.parts || []).map(part => part.text || '').filter(Boolean).join('\n');
+      if(answer) return answer;
+      lastErr = new Error(data.candidates?.[0]?.finishReason || 'Model returned no text.'); 
     } catch(e){ 
       lastErr = e; 
     } 
