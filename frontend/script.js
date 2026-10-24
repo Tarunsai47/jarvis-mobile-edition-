@@ -146,7 +146,7 @@ if(camBtn && imgInput){
 async function askVision(base64, mime, q){ 
   add('J.A.R.V.I.S: Analyzing image...', 'ai'); 
   let lastErr; 
-  for(const m of MODELS){ 
+  for(const m of await getAvailableModels()){ 
     try { 
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${API_KEY}`, {
         method: "POST",
