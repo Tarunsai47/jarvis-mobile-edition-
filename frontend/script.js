@@ -7,9 +7,11 @@ if(!API_KEY) {
 
 // Valid Gemini API model names:
 const MODELS = [
+  // Try newer models first. Older unsupported models are intentionally excluded.
+  "gemini-3.8-flash",
+  "gemini-2.5-flash-lite",
   "gemini-2.5-flash",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash"
+  "gemini-2.0-flash"
 ];
 
 // ===== 2. MEMORY SYSTEM =====
@@ -44,7 +46,7 @@ async function callGemini(p){
       const data = await res.json(); 
       if(data.error){ 
         lastErr = new Error(data.error.message); 
-        if(/high demand|temporar|quota|rate|unavailable|deprecated/i.test(data.error.message)) continue; 
+        if(/high demand|temporar|quota|rate|unavailable|deprecated|not found|not supported|no longer available/i.test(data.error.message)) continue; 
         throw lastErr; 
       } 
       return data.candidates[0].content.parts[0].text; 
@@ -108,7 +110,7 @@ async function askVision(base64, mime, q){
       const data = await res.json(); 
       if(data.error){ 
         lastErr = new Error(data.error.message); 
-        if(/high demand|temporar|quota|rate|unavailable|deprecated/i.test(data.error.message)) continue; 
+        if(/high demand|temporar|quota|rate|unavailable|deprecated|not found|not supported|no longer available/i.test(data.error.message)) continue; 
         throw lastErr; 
       } 
       const reply = data.candidates[0].content.parts[0].text; 
