@@ -105,6 +105,7 @@ async function callGemini(p) {
   const lastWorkingKey = 'jarvis_last_working_model_v1';
   const savedModel = localStorage.getItem(lastWorkingKey);
   let models = savedModel ? [savedModel] : await getAvailableModels();
+  let fallbackAttempted = false;
   let lastErr;
 
   // Fast path: immediately use the last model that successfully answered.
@@ -136,7 +137,8 @@ async function callGemini(p) {
           /high demand|temporar|quota|rate|unavailable|deprecated|not found|not supported|no longer available|overload/i.test(message);
 
         // If the saved model fails, discover compatible alternatives once.
-        if (savedModel && i === 0 && canRetry) {
+        if (savedModel && !fallbackAttempted && i === 0 && canRetry) {
+          fallbackAttempted = true;
           const discovered = await getAvailableModels();
           models = discovered.filter(name => name !== savedModel).slice(0, 2);
           i = -1;
@@ -157,7 +159,8 @@ async function callGemini(p) {
       }
 
       lastErr = new Error(data.candidates?.[0]?.finishReason || 'The model returned no text.');
-      if (savedModel && i === 0) {
+      if (savedModel && !fallbackAttempted && i === 0) {
+        fallbackAttempted = true;
         const discovered = await getAvailableModels();
         models = discovered.filter(name => name !== savedModel).slice(0, 2);
         i = -1;
@@ -169,7 +172,8 @@ async function callGemini(p) {
       lastErr = err.name === 'AbortError'
         ? new Error('J.A.R.V.I.S timed out. Please try again.')
         : err;
-      if (savedModel && i === 0 && !/timed out/i.test(lastErr.message)) {
+      if (savedModel && !fallbackAttempted && i === 0 && !/timed out/i.test(lastErr.message)) {
+        fallbackAttempted = true;
         const discovered = await getAvailableModels();
         models = discovered.filter(name => name !== savedModel).slice(0, 2);
         i = -1;
