@@ -189,6 +189,31 @@ async function callGemini(p) {
   throw lastErr || new Error('No compatible Gemini model responded.');
 }
 
+// ===== CHAT RESPONSE HANDLER =====
+let jarvisBusy = false;
+
+async function askGemini(promptText) {
+  if (jarvisBusy) return;
+  jarvisBusy = true;
+  if (sendBtn) sendBtn.disabled = true;
+
+  // Keep recent conversation context for the next request.
+  MEMORY.push({ role: 'user', text: promptText });
+  try {
+    const reply = await callGemini(promptText);
+    MEMORY.push({ role: 'model', text: reply });
+    MEMORY = MEMORY.slice(-20);
+    saveMemory();
+    add('J.A.R.V.I.S: ' + reply, 'ai');
+    speak(reply);
+  } catch (err) {
+    add('J.A.R.V.I.S: Sorry, I could not respond. ' + (err?.message || 'Please try again.'), 'ai');
+  } finally {
+    jarvisBusy = false;
+    if (sendBtn) sendBtn.disabled = false;
+  }
+}
+
 // ===== 4. VISION ENGINE (EYES) ===== 
 if(camBtn && imgInput){ 
   camBtn.onclick = () => imgInput.click(); 
