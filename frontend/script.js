@@ -5,7 +5,7 @@ if (!API_KEY) {
   if (API_KEY) localStorage.setItem('jarvis_key', API_KEY); 
 } 
 
-// Valid Gemini API model names:
+// Valid active Gemini API model identifiers:
 const MODELS = [
   "gemini-2.5-flash",
   "gemini-2.0-flash",
@@ -18,7 +18,7 @@ function saveMemory() {
   localStorage.setItem('jarvis_memory', JSON.stringify(MEMORY)); 
 } 
 
-// Wait for DOM to load fully before getting elements
+// Attach event listeners after DOM content finishes loading
 document.addEventListener('DOMContentLoaded', () => {
   const chat = document.getElementById('chat'); 
   const input = document.getElementById('msg'); 
@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const imgInput = document.getElementById('img-input'); 
   const sendBtn = document.getElementById('send');
 
-  // Load existing memory into chat
+  // Load stored memory
   MEMORY.forEach(m => add((m.role === 'user' ? 'YOU: ' : 'J.A.R.V.I.S: ') + m.text, m.role === 'user' ? 'user' : 'ai')); 
 
   // ===== 3. GEMINI BRAIN ===== 
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR - ' + lastErr.message; 
   } 
 
-  // ===== 5. VOICE & CONTROLS ===== 
+  // ===== 5. VOICE & UTILS ===== 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition; 
   if (SR && micBtn) { 
     const rec = new SR(); 
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
     speechSynthesis.speak(u); 
   } 
 
-  // SEND BUTTON CLICK & ENTER KEY PRESS
+  // SEND BUTTON & ENTER KEY HANDLERS
   if (sendBtn) {
     sendBtn.onclick = () => { 
       const t = input.value.trim(); 
@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   if (input) {
-    input.addEventListener('keypress', (e) => {
+    input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         const t = input.value.trim(); 
         if (!t) return; 
